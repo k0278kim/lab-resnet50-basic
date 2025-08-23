@@ -13,7 +13,7 @@ def get_lr(optimizer):
         return param_group['lr']
 
 
-def fit_one_epoch(net, softmaxloss, epoch, epoch_size, epoch_size_val, gen, gen_test, Epoch, cuda):
+def fit_one_epoch(net, softmaxloss, epoch, epoch_size, epoch_size_val, gen, gen_test, Epoch, cuda, optimizer):
     total_loss = 0
     val_loss = 0
 
@@ -21,24 +21,12 @@ def fit_one_epoch(net, softmaxloss, epoch, epoch_size, epoch_size_val, gen, gen_
         for iteration, batch in enumerate(gen):
             images, targets = batch[0], batch[1]
             if cuda:
-                images = images.cuda()
-                targets = targets.cuda()
+                images = images.cuda(non_blocking=True)
+                targets = targets.cuda(non_blocking=True)
 
-            # ----------------------#
-            #   清零梯度
-            # ----------------------#
             optimizer.zero_grad()
-            # ----------------------#
-            #   前向传播
-            # ----------------------#
             outputs = net(images)
-            # ----------------------#
-            #   计算损失
-            # ----------------------#
             loss = softmaxloss(outputs, targets)
-            # ----------------------#
-            #   反向传播
-            # ----------------------#
             loss.backward()
             optimizer.step()
             total_loss += loss
@@ -54,47 +42,39 @@ def fit_one_epoch(net, softmaxloss, epoch, epoch_size, epoch_size_val, gen, gen_
         for iteration, batch in enumerate(gen_test):
             images, targets = batch[0], batch[1]
             if cuda:
-                images = images.cuda()
-                targets = targets.cuda()
+                images = images.cuda(non_blocking=True)
+                targets = targets.cuda(non_blocking=True)
             outputs = net(images)
             _, id = torch.max(outputs.data, 1)
             test_correct += torch.sum(id == targets.data)
-            pbar.set_postfix(**{'test AP': float(100 * test_correct / len(test_dataset))})
+            pbar.set_postfix(**{'test AP': float(100 * test_correct / len(gen_test.dataset))})
             pbar.update(1)
     torch.save(net.state_dict(), 'logs/Epoch{}-Total_Loss{}.pth'.format((epoch + 1), (total_loss / ((iteration + 1)))))
 
 
 if __name__ == '__main__':
-    # ----------------------------#
-    #   是否使用Cuda
-    #   没有GPU可以设置成Fasle
-    # ----------------------------#
     cuda = True
-    # ----------------------------#
-    #   是否使用预训练模型
-    # ----------------------------#
     pre_train = True
-    # ----------------------------#
-    #   是否使用余弦退火学习率
-    # ----------------------------#
     CosineLR = True
 
-    # ----------------------------#
-    #   超参数设置
-    #   lr：学习率
-    #   Batch_size：batchsize大小
-    # ----------------------------#
     lr = 1e-3
     Batch_size = 512
     Init_Epoch = 0
     Fin_Epoch = 100
 
-    # 创建模型
+    # 모델 생성
     model = ResNet(Bottleneck, [3, 4, 6, 3], num_classes=10)
     if pre_train:
         model_path = 'logs/resnet50-mnist.pth'
         model.load_state_dict(torch.load(model_path))
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    # ✅ 여러 GPU 활용 (A10 두 대 자동 분배)
+    if torch.cuda.device_count() > 1:
+        print("사용 가능한 GPU 개수:", torch.cuda.device_count())
+        model = torch.nn.DataParallel(model)
+
     model = model.to(device)
 
     train_dataset = datasets.MNIST(root='data/', train=True,
@@ -102,8 +82,8 @@ if __name__ == '__main__':
     test_dataset = datasets.MNIST(root='data/', train=False,
                                   transform=transforms.ToTensor(), download=False)
 
-    gen = DataLoader(dataset=train_dataset, batch_size=Batch_size, shuffle=True, num_workers=0)
-    gen_test = DataLoader(dataset=test_dataset, batch_size=Batch_size // 2, shuffle=True, num_workers=0)
+    gen = DataLoader(dataset=train_dataset, batch_size=Batch_size, shuffle=True, num_workers=4, pin_memory=True)
+    gen_test = DataLoader(dataset=test_dataset, batch_size=Batch_size // 2, shuffle=False, num_workers=4, pin_memory=True)
 
     epoch_size = len(gen)
     epoch_size_val = len(gen_test)
@@ -118,5 +98,6 @@ if __name__ == '__main__':
 
     for epoch in range(Init_Epoch, Fin_Epoch):
         fit_one_epoch(net=model, softmaxloss=softmax_loss, epoch=epoch, epoch_size=epoch_size,
-                      epoch_size_val=epoch_size_val, gen=gen, gen_test=gen_test, Epoch=Fin_Epoch, cuda=cuda)
+                      epoch_size_val=epoch_size_val, gen=gen, gen_test=gen_test, Epoch=Fin_Epoch, cuda=cuda,
+                      optimizer=optimizer)
         lr_scheduler.step()
