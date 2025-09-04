@@ -16,7 +16,6 @@ LEARNING_RATE = 1e-3
 MODEL_SAVE_PATH = "./resnet50-imagenet.pth"
 RESUME_PATH = "checkpoint.pth"
 NUM_WORKERS = 4
-CUSTOM_CONV_LAYER_INDEX = 1
 
 
 def train(rank, world_size):
@@ -34,7 +33,6 @@ def train(rank, world_size):
         Bottleneck_imagenet, 
         [3, 4, 6, 3], 
         num_classes=1000, 
-        custom_conv_layer_index=CUSTOM_CONV_LAYER_INDEX
     ).to(device)
 
     model = nn.parallel.DistributedDataParallel(model, device_ids=[rank])
