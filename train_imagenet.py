@@ -6,7 +6,7 @@ import torch.multiprocessing as mp
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, distributed
 from tqdm import tqdm
-from nets.resnet50_1_imagenet import ResNet1_imagenet, Bottleneck1_imagenet
+from nets.resnet50_imagenet import ResNet1_imagenet, Bottleneck1_imagenet
 from nets.early_stopping import EarlyStopping
 
 # 하이퍼파라미터
