@@ -27,23 +27,6 @@ class Bottleneck_imagenet(nn.Module):
         self.stride = stride
 
     def forward(self, x):
-        '''
-        这块实现了残差块结构
-
-        ResNet50有两个基本的块，分别名为Conv Block和Identity Block，renet50就是利用了这两个结构堆叠起来的。
-        它们最大的差距是残差边上是否有卷积。
-
-        Identity Block是正常的残差结构，其残差边没有卷积，输入直接与输出相加；
-        Conv Block的残差边加入了卷积操作和BN操作（批量归一化），其作用是可以通过改变卷积操作的步长通道数，达到改变网络维度的效果。
-
-        也就是说
-        Identity Block输入维度和输出维度相同，可以串联，用于加深网络的；
-        Conv Block输入和输出的维度是不一样的，所以不能连续串联，它的作用是改变网络的维度。
-        :param
-        x:输入数据
-        :return:
-        out:网络输出结果
-        '''
         residual = x
 
         out = self.conv1(x)

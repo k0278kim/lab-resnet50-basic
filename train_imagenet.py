@@ -15,7 +15,7 @@ NUM_EPOCHS = 10
 LEARNING_RATE = 1e-3
 MODEL_SAVE_PATH = "./resnet50-imagenet.pth"
 RESUME_PATH = "checkpoint.pth"
-NUM_WORKERS = 4
+NUM_WORKERS = 3
 
 
 def train(rank, world_size):
